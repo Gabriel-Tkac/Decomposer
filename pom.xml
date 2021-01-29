@@ -5,27 +5,58 @@
   <version>0.0.1-SNAPSHOT</version>
   <name>Decomposer</name>
   <description>Sign containers decomposing tool</description>
+  
+  <properties>
+    <maven.compiler.target>1.8</maven.compiler.target>
+    <maven.compiler.source>1.8</maven.compiler.source>
+  </properties>
+  
   <dependencies>
-  	<dependency>
-  		<groupId>org.apache.pdfbox</groupId>
-  		<artifactId>pdfbox</artifactId>
-  		<version>2.0.21</version>
-  		<type>bundle</type>
-  	</dependency>
   	<dependency>
   		<groupId>joda-time</groupId>
   		<artifactId>joda-time</artifactId>
   		<version>2.10.8</version>
   	</dependency>
   	<dependency>
-  		<groupId>org.bouncycastle</groupId>
-  		<artifactId>bc-fips</artifactId>
-  		<version>1.0.2</version>
-  	</dependency>
+		<groupId>org.bouncycastle</groupId>
+		<artifactId>bcmail-jdk15on</artifactId>
+		<version>1.59</version>
+	</dependency>
+  	<dependency>
+		<groupId>org.bouncycastle</groupId>
+		<artifactId>bcmail-jdk15on</artifactId>
+		<version>1.59</version>
+	</dependency>
   	<dependency>
   		<groupId>org.apache.commons</groupId>
   		<artifactId>commons-compress</artifactId>
   		<version>1.15</version>
   	</dependency>
+  	<dependency>
+		<groupId>org.apache.commons</groupId>
+		<artifactId>commons-email</artifactId>
+		<version>1.5</version>
+	</dependency>
+	<dependency>
+		<groupId>org.apache.tika</groupId>
+		<artifactId>tika-core</artifactId>
+		<version>1.17</version>
+	</dependency>
+	<dependency>
+		<groupId>commons-codec</groupId>
+		<artifactId>commons-codec</artifactId>
+		<version>1.11</version>
+	</dependency>
+	<dependency>
+		<groupId>org.apache.santuario</groupId>
+		<artifactId>xmlsec</artifactId>
+		<!-- <version>2.1.4</version> -->
+		 <version>2.0.5</version>
+	</dependency>
+	<dependency>
+	    <groupId>org.apache.pdfbox</groupId>
+	    <artifactId>pdfbox</artifactId>
+   	    <version>2.0.21</version>
+  </dependency>
   </dependencies>
 </project>

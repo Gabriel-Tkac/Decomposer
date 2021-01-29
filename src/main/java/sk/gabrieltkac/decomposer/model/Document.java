@@ -1,7 +1,6 @@
 package sk.gabrieltkac.decomposer.model;
 
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
 
 public class Document {
@@ -13,9 +12,17 @@ public class Document {
 	private String extension;
 	private String MIMEType;
 	private String content;
+	private String originalContent;
 	private List<Signature> signatures;
 	private String description;
 	
+	private String processId;
+	private String appicationId;
+	private String serviceId;
+	
+	public Document() {
+	}
+
 	public Document(String name, String extension, String mIMEType) {
 		this.name = name;
 		this.extension = extension;
@@ -92,6 +99,38 @@ public class Document {
 
 	public void setDescription(String description) {
 		this.description = description;
+	}
+
+	public String getProcessId() {
+		return processId;
+	}
+
+	public String getOriginalContent() {
+		return originalContent;
+	}
+
+	public void setOriginalContent(String originalContent) {
+		this.originalContent = originalContent;
+	}
+
+	public void setProcessId(String processId) {
+		this.processId = processId;
+	}
+
+	public String getAppicationId() {
+		return appicationId;
+	}
+
+	public void setAppicationId(String appicationId) {
+		this.appicationId = appicationId;
+	}
+
+	public String getServiceId() {
+		return serviceId;
+	}
+
+	public void setServiceId(String serviceId) {
+		this.serviceId = serviceId;
 	}
 	
 

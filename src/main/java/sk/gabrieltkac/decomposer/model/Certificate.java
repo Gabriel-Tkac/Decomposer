@@ -13,6 +13,9 @@ public class Certificate {
 	private Date validTo;
 	private String content;
 	
+	public Certificate() {
+	}
+
 	public Certificate(String publisher, String serialNumber, String holderNumber) {
 		this.publisher = publisher;
 		this.serialNumber = serialNumber;
