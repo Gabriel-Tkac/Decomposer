@@ -19,7 +19,8 @@ public class Decomposer {
 		Container container;	
 		try {
 			
-			container = getDocument("C:\\Users\\Rastislav\\Desktop\\DWC Materiály\\Certifikáty a podpisové kontajnery\\Podpisové kontajnery\\FORM.asice");				
+			container = getDocument(" --- FILEPATH GOES HERE --- ");
+							
 			if (container.getSignatures() != null)
 				for (int i = 0; i < container.getSignatures().size(); i++) {
 					for (int j = 0; j < container.getSignatures().get(i).getDocuments().size(); j++) {
