@@ -28,9 +28,9 @@ import sk.gabrieltkac.decomposer.utils.Utils;
 public class ASiC {
 	
 	/**
-	 * Vytvori a vrati instanciu Container, reprezentujucu podpisovy kontajner typu ASiCE 
-	 * @param is - vstupny prud s obsahom podpisoveho kontajnera
-	 * @return instancia Container, reprezentujuca ASiCE kontajner
+	 * Creates Container instance for ASiCE document 
+	 * @param is - input stream - ASiC content
+	 * @return Container instance
 	 * @throws Exception 
 	 * @throws DocSplitterException
 	 */
@@ -115,12 +115,11 @@ public class ASiC {
 	}
 
 	/**
-	 * Z poloziek ZIP archivu (ASiCE suboru) vytvori instancie typu Document a vyplni im ID, nazov, MIME Type a obsah
-	 * Ak ide o XML dokument, pouzije jeho priamu strukturu, inak obsah zakoduje ako Base64 
-	 * @param decodedBytes - obsah ZIP polozky v podobe pola bytov
-	 * @param filename - nazov polozky, ktory sa pouzije ako nazov dokumentu
-	 * @param extension - pripona dokumentu
-	 * @return instancia docsplit.model.document.Document
+	 * Reads electronic documents form .zip structure
+	 * @param decodedBytes - byte array (zip content)
+	 * @param filename - will be used as document name
+	 * @param extension - document extension
+	 * @return docsplit.model.document.Document instance
 	 * @throws Exception
 	 */
 	public static Document getDocument(byte[] decodedBytes, String filename, String extension) throws Exception {
@@ -160,12 +159,11 @@ public class ASiC {
 	}
 
 	/**
-	 * Vytvori a vrati podpisy z polozky ZIP archivu (ASiCE suboru) s priponou xml/p7s
-	 * Ak je pripona xml, ide o kontajner typu ASICe-XAdES, inak ASICe-CAdES
-	 * @param decodedBytes - obsah ZIP polozky s podpismi v podobe pola bytov
-	 * @param documents - vstupne pole dokumentov, nacitanych z podpisoveho kontajnera
-	 * @param extension - pripona polozky archivu s podpismi
-	 * @return zoznam podpisov
+	 * Creates Signatures from ASiC file
+	 * @param decodedBytes - byte array (container content)
+	 * @param documents - Documents array
+	 * @param extension - archive extension
+	 * @return Signatures list
 	 * @throws Exception 
 	 */
 	private static List<Signature> getSignatures(Container container, byte[] decodedBytes, List<Document> documents, String extension) throws Exception {

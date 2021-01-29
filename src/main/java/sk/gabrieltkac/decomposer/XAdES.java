@@ -84,11 +84,10 @@ public class XAdES {
 	}
 	
 	/**
-	 * Nacita z XML struktury podpisoveho kontajnera obsahy dokumentov, ulozene v dcerskych elementoch korenoveho elementu DataEnvelope 
-	 * alebo DataSignatures (napr. Object) a vytvori z nich instancie docsplit.model.document.Document
-	 * @param objectsList - zoznam uzlov XML struktury podpisoveho kontajnera
-	 * @param documents - zoznam nacitanych dokumentov
-	 * @return zoznam nacitanych dokumentov
+	 * Reads document contents from sign container 
+	 * @param objectsList - XML Node list
+	 * @param documents - read documents
+	 * @return document list
 	 * @throws TransformerException
 	 */
 	public static List<Document> getDocuments(NodeList objectsList, List<Document> documents) throws TransformerException {
@@ -124,15 +123,11 @@ public class XAdES {
 	}
 	
 	/**
-	 * Nacita z XML struktury podpisoveho kontajnera XAdES informacie o podpisoch.
-	 * Dokumenty s podpismi sparuje podla hodnoty atributu URI v elemente ds:Reference bud priamo v korenovom elemente, 
-	 * alebo v elemente manifest v info o podpise.
-	 * Informacie o certifikate podpisu vyparsuje z elementu ds:KeyInfo.
-	 * Informacie o case podpisu a udaje casovej peciatky nacita z elementu <ds:Object><xades:QualifyingProperties>.
-	 * @param signaturesList - uzly XML datovej struktury podpisoveho kontajnera
-	 * @param documents - vstupny zoznam dokumentov pre vyhodnotenie prislusnosti dokumentov ku podpisom
-	 * @param signatures - vystupny zoznam objektov podpisov
-	 * @return zoznam instancii docsplit.model.document.Signature
+	 * Parses Signatures properties from container structure
+	 * @param signaturesList - XML Nodes to parse
+	 * @param documents - input documents list
+	 * @param signatures - output documents list
+	 * @return signatures list
 	 * @throws Exception
 	 */
 	public static List<Signature> getSignatures(NodeList signaturesList, List<Document> documents,
@@ -231,10 +226,10 @@ public class XAdES {
 														Constants.XADES_SIGNTIME, xmlXades.getBytes(), true, null)));
 											}
 											String ts = Utils.getValueByToken(Constants.XADESTIMESTAMP, xmlXades.getBytes(), true, null);
-											signature.setTimestamp(CAdES.getDateTimeStampFromString(ts).toInstant()
-													      .atZone(ZoneId.systemDefault())
-													      .toLocalDateTime());
-											signature.setTimestampUTC(Utils.dateToString(CAdES.getDateTimeStampFromString(ts), Utils.sdf0));
+											if (CAdES.getDateTimeStampFromString(ts) != null) {
+												signature.setTimestamp(Utils.dateToDateTime(CAdES.getDateTimeStampFromString(ts)));
+												signature.setTimestampUTC(Utils.dateToString(CAdES.getDateTimeStampFromString(ts), Utils.sdf0));
+											}
 											timeStamp = CAdES.createTimeStampFromString(ts);
 										}
 
@@ -600,6 +595,7 @@ public class XAdES {
 		DocumentBuilder documentBuilder = dfactory.newDocumentBuilder();
 		documentBuilder.setErrorHandler(new IgnoreAllErrorHandler());
 		org.w3c.dom.Document doc = documentBuilder.parse(input);
+		System.out.println("Canon: " + canonicalizationMethod);
 		Canonicalizer canonicalizer = Canonicalizer.getInstance(canonicalizationMethod);
 		return canonicalizer.canonicalizeSubtree(doc);
 	}
@@ -620,11 +616,10 @@ public class XAdES {
 	}
 	
 	/**
-	 * Vyplni MIME Type dokumentom podla manifestu podpisoveho kontajnera -
-	 * atribut MimeType alebo media-type
-	 * @param docsForSignature - zoznam dokumentov pre vyplnenie MIME Type
-	 * @param xmlAsiceManifest - retazec reprezentujuci XML strukturu manifestu podpisoveho kontajnera
-	 * @return zoznam dokumentov s vyplnenym MIME Type
+	 * Fills MIME Type to the documents according to container manifest
+	 * @param docsForSignature - documents to fill MIME Type
+	 * @param xmlAsiceManifest - manifest content
+	 * @return documents with MIME Type set
 	 * @throws ParserConfigurationException
 	 * @throws SAXException
 	 * @throws IOException

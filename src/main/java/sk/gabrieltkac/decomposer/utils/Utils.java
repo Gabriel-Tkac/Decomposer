@@ -254,11 +254,10 @@ public class Utils {
 	}
 
 	/**
-	 * Vrati textovu reprezentaciu uzla XML dokumentu, pricom vlastnosti kodovania a verzie
-	 * prebera zo vstupnej instancie org.w3c.dom.Document  
-	 * @param pomNode - uzol XML dokumentu
-	 * @param document - instancia org.w3c.dom.Document, ktorej vlastnosti preberame
-	 * @return textova reprezentacia uzla
+	 * Gets a text representation of XML Node  
+	 * @param pomNode - XML Node
+	 * @param document - source org.w3c.dom.Document instance
+	 * @return text representation of input node
 	 * @throws TransformerException
 	 */
 	private static String getTextNode(Node pomNode, Document document) throws TransformerException {
@@ -368,12 +367,12 @@ public class Utils {
 	}
 	
 	/**
-	 * Ziska z XML dokumentu obsah daneho elementu prip. atributu
-	 * @param token - nazov elementu, ktoreho obsah chceme vratit
-	 * @param xml - XML Dokument v podobe pola bytov
-	 * @param plainText - ci chceme vratit iba textovy obsah daneho tokenu
-	 * @param attribute - atribut v ramci elementu, ktory chceme precitat
-	 * @return obsah daneho elementu
+	 * Extracts element or attribute value from XML document
+	 * @param token - element name to evaluate
+	 * @param xml - byte array - XML Document content
+	 * @param plainText - parse only plain text
+	 * @param attribute - attribute to read
+	 * @return element content
 	 * @throws ParserConfigurationException
 	 * @throws SAXException
 	 * @throws IOException
@@ -436,9 +435,9 @@ public class Utils {
 	}
 	
 	/**
-	 * Vytvori instanciu java.util.Date zo vstupneho retazca formatu yyyy-MM-dd'T'HH:mm:ss
-	 * @param dateString - vstupny retazec
-	 * @return instancia datumu (java.uitl.Date)
+	 * Transforms formatted string of yyyy-MM-dd'T'HH:mm:ss to java.util.Date 
+	 * @param dateString - input string
+	 * @return java.uitl.Date instance
 	 */
 	public static Date stringToDate(String dateString) {
 		Date date = null;
@@ -461,7 +460,6 @@ public class Utils {
 	
 
 	public static String dateToUTCString(Calendar signDate) {
-		String timeZone = signDate.getTimeZone().getID();
 		return dateToString(new Date(
 				signDate.getTimeInMillis()),
 				sdf0);

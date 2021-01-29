@@ -15,6 +15,35 @@ import sk.gabrieltkac.decomposer.utils.Utils;
 
 public class Decomposer {
 	
+	public static void main(String[] args) {
+		Container container;	
+		try {
+			
+			container = getDocument("C:\\Users\\Rastislav\\Desktop\\DWC Materiály\\Certifikáty a podpisové kontajnery\\Podpisové kontajnery\\FORM.asice");				
+			if (container.getSignatures() != null)
+				for (int i = 0; i < container.getSignatures().size(); i++) {
+					for (int j = 0; j < container.getSignatures().get(i).getDocuments().size(); j++) {
+						System.out.println("---------- Document No. " + j + " -----------");
+						System.out.println("dokument typ: \t\t" + container.getContainerType().name());
+						System.out.println("dokument: \t\t" + container.getSignatures().get(i).getDocuments().get(j).getContent().substring(0, 100));
+						System.out.println("mimeType: \t\t" + container.getSignatures().get(i).getDocuments().get(j).getMIMEType());
+						System.out.println("pripona: \t\t" + container.getSignatures().get(i).getDocuments().get(j).getExtension());
+						System.out.println("datumPodpisu: \t\t" + container.getSignatures().get(i).getSignatureTimeUTC());
+						System.out.println("datumPodpisuString: \t" + container.getSignatures().get(i).getSignatureTime());
+						
+					}
+					System.out.println("datum CP: \t\t" + container.getSignatures().get(i).getTimestamp());
+					System.out.println("datum CPString: \t" + container.getSignatures().get(i).getSignatureTimeUTC());
+					System.out.println("certifikat CP: \t\t" + container.getSignatures().get(i).getTimestampCertificate().getHolderId());
+					System.out.println("certifikat podpisu: \t" + container.getSignatures().get(i).getSignatureCertificate().getHolderId());
+					
+				}
+		} 
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
 	
 	/**
 	 * Creates Container instance
@@ -35,7 +64,7 @@ public class Decomposer {
 	 * @return Container instance
 	 * @throws Exception
 	 */
-	public Container getDocument(String fileName) throws Exception {
+	public static Container getDocument(String fileName) throws Exception {
 		File file = new File(fileName);
 		InputStream is = new FileInputStream(file);
 		return getDocumentByType(is, "", false);
