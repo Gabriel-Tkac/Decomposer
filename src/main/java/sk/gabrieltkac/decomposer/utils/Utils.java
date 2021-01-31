@@ -15,6 +15,7 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Enumeration;
@@ -44,6 +45,9 @@ import javax.xml.xpath.XPathFactory;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.tika.io.IOUtils;
+import org.apache.xml.security.c14n.Canonicalizer;
+import org.apache.xml.security.utils.IgnoreAllErrorHandler;
+import org.bouncycastle.asn1.cms.ContentInfo;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.w3c.dom.Document;
@@ -54,7 +58,6 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
 import sk.gabrieltkac.decomposer.Logging;
-import sk.gabrieltkac.decomposer.XAdES;
 import sk.gabrieltkac.decomposer.model.ContainerType;
 
 public class Utils {
@@ -229,6 +232,8 @@ public class Utils {
 					output.close();
 				}
 			}
+			System.out.println("Temp file crearted: " + outFile.getName());
+			System.out.println("Temp file length: " + outFile.length());
 			return outFile;
 		} 
 		catch (IOException e) {
@@ -332,7 +337,7 @@ public class Utils {
 
 			String docMimeType = doc.getMIMEType();
 			if ((!transform.isEmpty() || !"".equals(transform)) && docMimeType != null && docMimeType.equals(Constants.MIME_TYPE_FORM)) {
-				obsah = XAdES.canonicalize(XAdES.removeBOM(doc.getOriginalContent()), transform);
+				obsah = canonicalize(removeBOM(doc.getOriginalContent()), transform);
 				obsah = java.util.Base64.getEncoder().encodeToString(obsah.getBytes());
 			}
 
@@ -363,6 +368,29 @@ public class Utils {
 		catch (Exception e) {
 			Logging.logException(e, false, Constants.logFilepath);
 			return false;
+		}
+	}
+	
+	static byte[] canonicalize(ByteArrayInputStream input, String canonicalizationMethod) throws Exception {
+		DocumentBuilderFactory dfactory = DocumentBuilderFactory.newInstance();
+		dfactory.setNamespaceAware(true);
+		dfactory.setValidating(true);
+		DocumentBuilder documentBuilder = dfactory.newDocumentBuilder();
+		documentBuilder.setErrorHandler(new IgnoreAllErrorHandler());
+		org.w3c.dom.Document doc = documentBuilder.parse(input);
+		System.out.println("Canon: " + canonicalizationMethod);
+		Canonicalizer canonicalizer = Canonicalizer.getInstance(canonicalizationMethod);
+		return canonicalizer.canonicalizeSubtree(doc);
+	}
+	
+	public static String canonicalize(String input, String canonicalizationMethod) throws Exception {
+		if (input == null) {
+			return "";
+		} 
+		else {
+			ByteArrayInputStream inputStr = new ByteArrayInputStream(input.getBytes("UTF-8"));
+			byte[] output = canonicalize(inputStr, canonicalizationMethod);
+			return output != null ? new String(output, "UTF-8") : "";
 		}
 	}
 	
@@ -542,6 +570,68 @@ public class Utils {
 			throw new IllegalStateException(String.format("Unable to determine MIME type of %s", filename));
 		}
 		return mimeType;
+	}
+	
+	/**
+	 * Reads MIME Type of input instance org.bouncycastle.asn1.cms.ContentInfo<br>
+	 * and sets it to all input Document instances
+	 * @param contentInfo - org.bouncycastle.asn1.cms.ContentInfo instance
+	 * @param documents - Document instances to set MIME Type
+	 */
+	public static void setMimeType(ContentInfo contentInfo, List<sk.gabrieltkac.decomposer.model.Document> documents) {
+		String mimeType = null;
+		String contentInfoString = contentInfo.getContent().toString();
+		if (contentInfoString.indexOf("Content-Type:") != -1)
+			mimeType = contentInfoString.substring(contentInfoString.indexOf("Content-Type:") + 14,
+					contentInfoString.indexOf("Content-Type:") + 30);
+		if (mimeType != null)
+			for (sk.gabrieltkac.decomposer.model.Document document : documents) {
+				if (document.getMIMEType() == null)
+					document.setMIMEType(mimeType.trim());
+			}
+	}
+	
+	public static String removeBOM(String s) {
+		if (s.startsWith(Constants.UTF8_BOM))
+			System.out.println("Retazec obsahuje BOM");
+		return s != null && s.length() != 0 ? (s.startsWith(Constants.UTF8_BOM) ? s.substring(1) : s) : s;
+	}
+	
+	public static byte[] /*String*/ decodeBase64(String base64) {
+		String decoded = null;
+		String decodedUtils = null;
+		String decodedApache = null;
+		
+		byte[] decodedArr = null;
+		byte[] decodedUtilsArr = null;
+		byte[] decodedApacheArr = null;
+		try {
+			decodedUtils = new String(Base64.getDecoder().decode(base64));
+			decodedUtilsArr = Base64.getDecoder().decode(base64);
+		}
+		catch (Exception e) {
+			System.out.println("Base 64 decoding with java.utils.Base64 was not successful");
+		}
+		
+		try {
+			decodedApache = new String(org.apache.commons.codec.binary.Base64.decodeBase64(base64));
+			decodedApacheArr = org.apache.commons.codec.binary.Base64.decodeBase64(base64);
+		}
+		catch (Exception e) {
+			System.out.println("Base 64 decoding with org.apache.commons was not successful");
+		}
+		
+		if (decodedUtils != null)
+			decoded = decodedUtils;
+		if (decodedApache != null)
+			decoded = decodedApache;
+		
+		if (decodedUtilsArr != null)
+			decodedArr = decodedUtilsArr;
+		if (decodedApacheArr != null)
+			decodedArr = decodedApacheArr;
+		
+		return decodedArr;
 	}
 
 }

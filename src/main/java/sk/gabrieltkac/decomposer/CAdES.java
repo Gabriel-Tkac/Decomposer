@@ -10,6 +10,7 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -23,8 +24,17 @@ import javax.mail.BodyPart;
 import javax.mail.Multipart;
 import javax.mail.internet.MimeMessage;
 
+import org.bouncycastle.asn1.ASN1EncodableVector;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.ASN1UTCTime;
+import org.bouncycastle.asn1.cms.Attribute;
+import org.bouncycastle.asn1.cms.AttributeTable;
+import org.bouncycastle.asn1.cms.CMSAttributes;
+import org.bouncycastle.asn1.cms.ContentInfo;
+import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cms.CMSException;
 import org.bouncycastle.cms.CMSSignedData;
 import org.bouncycastle.cms.SignerInformation;
 import org.bouncycastle.cms.SignerInformationStore;
@@ -126,14 +136,14 @@ public class CAdES {
 	}
 	
 	/**
-	 * Loads documents from input byte aray<br>
+	 * Loads documents from input byte array
 	 * @param is - input byte array
 	 * @param filename - input filename
 	 * @param extension - input extension
 	 * @return document list
 	 * @throws Exception
 	 */
-	private static List<Document> getDocuments(byte[] is, String filename, String extension) throws Exception {
+	static List<Document> getDocuments(byte[] is, String filename, String extension) throws Exception {
 		List<Document> documents = new ArrayList<Document>();
 		if ("eml".equals(extension)) {
 			MimeMessage message = new MimeMessage(null, new ByteArrayInputStream(is));
@@ -225,23 +235,12 @@ public class CAdES {
 		return documents;
 	}
 	
-	static List<Signature> getSignatures(byte[] is, List<Document> documents) {
-		List<Signature> signatures = new ArrayList<Signature>();
-		try {
-			signatures = getSignatures(is, documents);
-		} 
-		catch (Exception e) {
-			Logging.logException(e, false, Constants.logFilepath);
-		}
-		return signatures;
-	}
-	
 	/**
 	 * Creates instance of Container 
 	 * @param is - input stream with sign container content
 	 * @return docsplit.model.document.Container insance - sign container
 	 */
-	public static Container getDocument(final InputStream is) {
+	static Container getDocument(final InputStream is) {
 		Container container = new Container();
 		container.setContainerType(ContainerType.CAdES);
 		List<Document> documents = new ArrayList<Document>();
@@ -316,6 +315,83 @@ public class CAdES {
 		return container;
 	}
 	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	static List<Signature> getSignatures(byte[] is, List<Document> documents)
+			throws CMSException, CertificateException, IOException, ParseException {
+		List<Signature> signatures = new ArrayList<Signature>();
+		List<Certificate> certificates = new ArrayList<Certificate>();
+		
+		
+		Signature signature = new Signature();
+		Certificate certificate;
+		CMSSignedData sig = null;
+		sig = new CMSSignedData(is);
+		
+		ContentInfo contentInfo = sig.toASN1Structure();
+		Utils.setMimeType(contentInfo, documents);
+		
+		Store cs = sig.getCertificates();
+		SignerInformationStore signers = sig.getSignerInfos();		
+	
+		Collection<?> c = signers.getSigners();
+		Iterator<?> it = c.iterator();
+		Date signingTimeDate = null;
+
+		int i = 0;
+		while (it.hasNext()) {
+			SignerInformation signer = (SignerInformation) it.next();
+			signature.setName("Signature " + i);
+			signature.setId(java.util.UUID.randomUUID().toString());
+			Collection certCollection = cs.getMatches(signer.getSID());
+			Iterator certIt = certCollection.iterator();
+			X509CertificateHolder certHolder = (X509CertificateHolder) certIt.next();
+			X509Certificate certFromSignedData = new JcaX509CertificateConverter().getCertificate(certHolder);
+			certificate = getCertificate(certFromSignedData);
+			signature.setSignatureCertificate(certificate);
+			certificates.add(certificate);
+			i++;
+
+			AttributeTable signedAttributes = signer.getSignedAttributes();
+			AttributeTable unSignedAttributes = signer.getUnsignedAttributes();
+			Attribute attributeTimeStamp = null;
+
+			try {
+				ASN1EncodableVector vector = unSignedAttributes
+						.getAll(new ASN1ObjectIdentifier(PKCSObjectIdentifiers.id_aa_signatureTimeStampToken.getId()));
+				attributeTimeStamp = (Attribute) vector.get(0);
+				if (attributeTimeStamp != null) {
+					byte[] varTimeStamp = attributeTimeStamp.getAttrValues().getObjectAt(0).toASN1Primitive()
+							.getEncoded();
+					TimeStampToken timeStampToken = new TimeStampToken(new CMSSignedData(varTimeStamp));
+					signature.setTimestamp(Utils.dateToDateTime(timeStampToken.getTimeStampInfo().getGenTime()));
+					signature.setTimestampUTC(Utils.dateToString(timeStampToken.getTimeStampInfo().getGenTime(), Utils.sdf0));
+					Store certsStore = timeStampToken.getCertificates();
+					ArrayList certs = new ArrayList(certsStore.getMatches((Selector) null));
+					certHolder = (X509CertificateHolder) certs.get(0);
+					certFromSignedData = new JcaX509CertificateConverter().getCertificate(certHolder);
+					certificate = getCertificate(certFromSignedData);
+					certificates.add(certificate);
+					signature.setTimestampCertificate(certificate);
+				}
+			} 
+			catch (Exception ex) {
+				Logging.logException(ex, false, Constants.logFilepath);
+			}
+
+			Attribute signingTime = signedAttributes.get(CMSAttributes.signingTime);
+			if (signingTime != null) {
+				signingTimeDate = (((ASN1UTCTime) signingTime.getAttrValues().getObjectAt(0)).getDate());
+				signature.setSignatureTime(Utils.dateToDateTime(signingTimeDate));
+				signature.setSignatureTimeUTC(Utils.dateToString(signingTimeDate, Utils.sdf0));
+				signature.setSignatureTimeHasBeehShifted(true);
+			}
+		}
+
+		signature.setDocuments(documents);
+		signatures.add(signature);
+		return signatures;
+	}
+	
 	
 	
 	/**
@@ -323,7 +399,7 @@ public class CAdES {
 	 * @param certB64 - certificate content
 	 * @return certificate instance
 	 */
-	public static Certificate getCertificateFromBase64(String certB64) {
+	static Certificate getCertificateFromBase64(String certB64) {
 		Certificate certificate = new Certificate();
 		byte encodedCert[] = java.util.Base64.getDecoder().decode(certB64.getBytes());
 		ByteArrayInputStream inputStream = new ByteArrayInputStream(encodedCert);
@@ -345,11 +421,52 @@ public class CAdES {
 	}
 	
 	/**
+	 * Creates certificate instance
+	 * @param X509Cert - java.security.cert.X509Certificate instance
+	 * @return docsplit.model.document.Certificate instance
+	 */
+	static Certificate getCertificate(X509Certificate X509Cert) {
+		Certificate certificate = new Certificate();
+		try {
+			certificate.setPublisher(X509Cert.getIssuerDN().getName());
+			certificate.setHolderId(X509Cert.getSubjectDN().getName());
+			certificate.setValidFrom(X509Cert.getNotBefore());
+			certificate.setValidTo(X509Cert.getNotAfter());
+			certificate.setSerialNumber(X509Cert.getSerialNumber().toString(16));
+			certificate.setContent(java.util.Base64.getEncoder().encodeToString(X509Cert.getEncoded()));
+		} 
+		catch (CertificateEncodingException e) {
+			Logging.logException(e, false, Constants.logFilepath);
+		}
+		return certificate;
+	}
+	
+	static Collection<X509Certificate> getSignersCertificates(CMSSignedData previewSignerData) {
+		Collection<X509Certificate> result = new HashSet<X509Certificate>();
+		Store<?> certStore = previewSignerData.getCertificates();
+		SignerInformationStore signers = previewSignerData.getSignerInfos();
+		Iterator<?> it = signers.getSigners().iterator();
+		while (it.hasNext()) {
+			SignerInformation signer = (SignerInformation) it.next();
+			@SuppressWarnings("unchecked")
+			Collection<?> certCollection = certStore.getMatches(signer.getSID());
+			Iterator<?> certIt = certCollection.iterator();
+			X509CertificateHolder certificateHolder = (X509CertificateHolder) certIt.next();
+			try {
+				result.add(new JcaX509CertificateConverter().getCertificate(certificateHolder));
+			} 
+			catch (CertificateException error) {
+			}
+		}
+		return result;
+	}
+	
+	/**
 	 * Creates Timestamp certificate
 	 * @param timestampString - byte array certificate content
 	 * @return certificate instance
 	 */
-	public static Certificate createTimeStampFromString(String timestampString) {
+	static Certificate createTimeStampFromString(String timestampString) {
 		Certificate certificate = new Certificate();
 		TimeStampToken tst;
 		if (timestampString == null || "".equals(timestampString)) {
@@ -379,7 +496,7 @@ public class CAdES {
 	 * @param tsToken - TimeStampToken
 	 * @return org.bouncycastle.cert.X509CertificateHolder instance
 	 */
-	public static X509CertificateHolder getTimeStampCert(TimeStampToken tsToken) {
+	static X509CertificateHolder getTimeStampCert(TimeStampToken tsToken) {
 		X509CertificateHolder signerCert = null;
 		if (tsToken != null) {
 			@SuppressWarnings("rawtypes")
@@ -407,7 +524,7 @@ public class CAdES {
 	 * @param timestampString - TS certificate string
 	 * @return date
 	 */
-	public static Date getDateTimeStampFromString(String timestampString) {
+	static Date getDateTimeStampFromString(String timestampString) {
 		Date date = null;
 		TimeStampToken tst = null;
 		if (!timestampString.isEmpty()) {
@@ -420,47 +537,6 @@ public class CAdES {
 			}
 		}
 		return date;
-	}
-	
-	/**
-	 * Creates certificate instance
-	 * @param X509Cert - java.security.cert.X509Certificate instance
-	 * @return docsplit.model.document.Certificate instance
-	 */
-	public static Certificate getCertificate(X509Certificate X509Cert) {
-		Certificate certificate = new Certificate();
-		try {
-			certificate.setPublisher(X509Cert.getIssuerDN().getName());
-			certificate.setHolderId(X509Cert.getSubjectDN().getName());
-			certificate.setValidFrom(X509Cert.getNotBefore());
-			certificate.setValidTo(X509Cert.getNotAfter());
-			certificate.setSerialNumber(X509Cert.getSerialNumber().toString(16));
-			certificate.setContent(java.util.Base64.getEncoder().encodeToString(X509Cert.getEncoded()));
-		} 
-		catch (CertificateEncodingException e) {
-			Logging.logException(e, false, Constants.logFilepath);
-		}
-		return certificate;
-	}
-	
-	public static Collection<X509Certificate> getSignersCertificates(CMSSignedData previewSignerData) {
-		Collection<X509Certificate> result = new HashSet<X509Certificate>();
-		Store<?> certStore = previewSignerData.getCertificates();
-		SignerInformationStore signers = previewSignerData.getSignerInfos();
-		Iterator<?> it = signers.getSigners().iterator();
-		while (it.hasNext()) {
-			SignerInformation signer = (SignerInformation) it.next();
-			@SuppressWarnings("unchecked")
-			Collection<?> certCollection = certStore.getMatches(signer.getSID());
-			Iterator<?> certIt = certCollection.iterator();
-			X509CertificateHolder certificateHolder = (X509CertificateHolder) certIt.next();
-			try {
-				result.add(new JcaX509CertificateConverter().getCertificate(certificateHolder));
-			} 
-			catch (CertificateException error) {
-			}
-		}
-		return result;
 	}
 
 }

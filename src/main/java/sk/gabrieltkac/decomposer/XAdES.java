@@ -14,8 +14,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.TransformerException;
 
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.xml.security.c14n.Canonicalizer;
-import org.apache.xml.security.utils.IgnoreAllErrorHandler;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -90,7 +88,7 @@ public class XAdES {
 	 * @return document list
 	 * @throws TransformerException
 	 */
-	public static List<Document> getDocuments(NodeList objectsList, List<Document> documents) throws TransformerException {
+	static List<Document> getDocuments(NodeList objectsList, List<Document> documents) throws TransformerException {
 		Document document = null;
 		String idPrev = "";
 		for (int i = 0; i < objectsList.getLength(); i++) {
@@ -130,7 +128,7 @@ public class XAdES {
 	 * @return signatures list
 	 * @throws Exception
 	 */
-	public static List<Signature> getSignatures(NodeList signaturesList, List<Document> documents,
+	static List<Signature> getSignatures(NodeList signaturesList, List<Document> documents,
 			List<Signature> signatures) throws Exception {
 		List<Document> docsForSignature = new ArrayList<Document>();
 		Certificate certificate = null;
@@ -160,8 +158,6 @@ public class XAdES {
 									if (ref.getNodeType() == Node.ELEMENT_NODE) {
 										Element refElement = (Element) ref;
 										if ("ds:Reference".equals(refElement.getNodeName())) {
-											// priradenie dokumentov do
-											// signature
 											if (documents != null) {
 												for (Document doc : documents) {
 													if (refElement.getAttribute("URI").substring(1).equals(doc.getId())
@@ -246,7 +242,6 @@ public class XAdES {
 																		| refElement.getAttribute("URI").equals(doc.getId())
 																		| URLDecoder.decode(refElement.getAttribute("URI"), "UTF-8").equals(doc.getId())
 																		| Utils.isSameDigestValue(refElement, doc)) {
-																	Element parent = (Element) refElement.getParentNode();
 																	docsForSignature.add(doc);
 																}
 															}
@@ -281,7 +276,7 @@ public class XAdES {
 	 * @param docsForSignature - incoming document list
 	 * @return unique document list
 	 */
-	private static List<Document> checkUnique(List<Document> docsForSignature) {
+	static List<Document> checkUnique(List<Document> docsForSignature) {
 		Set<Document> hs = new LinkedHashSet<>();
 		hs.addAll(docsForSignature);
 		docsForSignature.clear();
@@ -298,7 +293,7 @@ public class XAdES {
 	 * @param nodeList - XML Node list
 	 * @return level type
 	 */
-	public static String resolveBPLevel(NodeList childReferene) {
+	static String resolveBPLevel(NodeList childReferene) {
 		String bpLevel = "XadesBPLevel";
 
 		boolean hasUnsignedProperties = false; // Level B
@@ -341,7 +336,7 @@ public class XAdES {
 	 * @param zoznam - current node list
 	 * @return zoznam - resulting node list
 	 */
-	public static List<Node> getNodeChildrenList(Node node, int level, List<Node> zoznam) {
+	static List<Node> getNodeChildrenList(Node node, int level, List<Node> zoznam) {
 		NodeList list = node.getChildNodes();
 		for (int i = 0; i < list.getLength(); i++) {
 			Node childNode = list.item(i);
@@ -353,6 +348,65 @@ public class XAdES {
 	}
 	
 	/**
+	 * Fills MIME Type to the documents according to container manifest
+	 * @param docsForSignature - documents to fill MIME Type
+	 * @param xmlAsiceManifest - manifest content
+	 * @return documents with MIME Type set
+	 * @throws ParserConfigurationException
+	 * @throws SAXException
+	 * @throws IOException
+	 */
+	static List<Document> setMimeType(List<Document> docsForSignature, String xmlAsiceManifest)
+			throws ParserConfigurationException, SAXException, IOException {
+		DocumentBuilderFactory dbf;
+		DocumentBuilder db;
+		InputSource source;
+		org.w3c.dom.Document domDocument = null;
+
+		dbf = DocumentBuilderFactory.newInstance();
+		db = dbf.newDocumentBuilder();
+		source = new InputSource(new ByteArrayInputStream(xmlAsiceManifest.getBytes()));
+		domDocument = db.parse(source);
+		domDocument.getDocumentElement().normalize();
+
+		NodeList dataObjectFormatList = domDocument.getDocumentElement().getElementsByTagName("asic:DataObjectReference");
+		if (dataObjectFormatList.getLength() > 0) {
+			for (int i = 0; i < dataObjectFormatList.getLength(); i++) {
+				Node obj = dataObjectFormatList.item(i);
+				if (obj.getNodeType() == Node.ELEMENT_NODE) {
+					Element objElement = (Element) obj;
+					for (Document document : docsForSignature) {
+						if (document.getName() != null) {
+							if (document.getName().equals(objElement.getAttribute("URI")) || document.getId().equals(objElement.getAttribute("URI"))) {
+								if (document.getMIMEType() == null)
+									document.setMIMEType(objElement.getAttribute("MimeType"));
+							}
+						}
+					}
+				}
+			}
+		} 
+		else {
+			dataObjectFormatList = domDocument.getDocumentElement().getElementsByTagName("manifest:file-entry");
+			for (int i = 0; i < dataObjectFormatList.getLength(); i++) {
+				Node obj = dataObjectFormatList.item(i);
+				if (obj.getNodeType() == Node.ELEMENT_NODE) {
+					Element objElement = (Element) obj;
+					for (Document document : docsForSignature) {
+						if (document.getName() != null) {
+							if (document.getName().equals(objElement.getAttribute("manifest:full-path")) || document.getId().equals(objElement.getAttribute("manifest:full-path"))) {
+								if (objElement.getAttribute("manifest:media-type") != null)
+									document.setMIMEType(objElement.getAttribute("manifest:media-type"));
+							}
+						}
+					}
+				}
+			}
+		}
+		return docsForSignature;
+	}
+	
+	/**
 	 * Fills in name, extension and MIME Type to documents
 	 * @param docsForSignature - documents to set properties
 	 * @param xmlXades - XML XAdES
@@ -361,7 +415,7 @@ public class XAdES {
 	 * @throws SAXException
 	 * @throws IOException
 	 */
-	public static List<Document> setNameAndMimeType(List<Document> docsForSignature, String xmlXades)
+	static List<Document> setNameAndMimeType(List<Document> docsForSignature, String xmlXades)
 			throws ParserConfigurationException, SAXException, IOException {
 		DocumentBuilderFactory dbf;
 		DocumentBuilder db;
@@ -424,7 +478,7 @@ public class XAdES {
 		return docsForSignature;
 	}
 	
-	private static boolean isSameDigestValue(Node refElement, Document doc) {
+	static boolean isSameDigestValue(Node refElement, Document doc) {
 		byte[] digest;
 		if (doc.getContent().isEmpty())
 			return false;
@@ -461,7 +515,7 @@ public class XAdES {
 
 			String docMimeType = doc.getMIMEType();
 			if (!transform.isEmpty() && docMimeType != null && docMimeType.equals(Constants.MIME_TYPE_FORM)) {
-				obsah = canonicalize(removeBOM(doc.getOriginalContent()), transform);
+				obsah = Utils.canonicalize(Utils.removeBOM(doc.getOriginalContent()), transform);
 				obsah = Base64.getEncoder().encodeToString(obsah.getBytes()); 
 			}
 
@@ -495,36 +549,7 @@ public class XAdES {
 		}
 	}
 
-	private static boolean isSameDigestValue1(Node refElement, Document doc) {
-
-		if (doc.getContent().isEmpty())
-			return false;
-		String digestValue = "";
-		try {
-			NodeList refs = refElement.getChildNodes();
-			for (int k = 0; k < refs.getLength(); k++) {
-				Node ref = refs.item(k);
-				if (ref.getNodeType() == Node.ELEMENT_NODE) {
-					Element e = (Element) ref;
-
-					if ("ds:DigestValue".equals(e.getNodeName())) {
-						digestValue = Utils.getTextNode(e);
-					}
-
-				}
-			}
-			if (getActualDigestValue(refElement, doc).equals(digestValue))
-				return true;
-			else
-				return false;
-		} 
-		catch (Exception e) {
-			Logging.logException(e, false, Constants.logFilepath);
-			return false;
-		}
-	}
-	
-	public static String getActualDigestValue(Node refElement, Document doc) {
+	static String getActualDigestValue(Node refElement, Document doc) {
 		byte[] digest;
 		if (doc.getContent().isEmpty())
 			return null;
@@ -557,7 +582,7 @@ public class XAdES {
 			}
 
 			if ((!transform.isEmpty() || !"".equals(transform)) && doc.getMIMEType().equals(Constants.MIME_TYPE_FORM)) {
-				obsah = canonicalize(removeBOM(doc.getOriginalContent()), transform);
+				obsah = Utils.canonicalize(Utils.removeBOM(doc.getOriginalContent()), transform);
 				obsah = Base64.getEncoder().encodeToString(obsah.getBytes());
 			}
 
@@ -588,90 +613,5 @@ public class XAdES {
 		return actualDigetstValue;
 	}
 	
-	public static byte[] canonicalize(ByteArrayInputStream input, String canonicalizationMethod) throws Exception {
-		DocumentBuilderFactory dfactory = DocumentBuilderFactory.newInstance();
-		dfactory.setNamespaceAware(true);
-		dfactory.setValidating(true);
-		DocumentBuilder documentBuilder = dfactory.newDocumentBuilder();
-		documentBuilder.setErrorHandler(new IgnoreAllErrorHandler());
-		org.w3c.dom.Document doc = documentBuilder.parse(input);
-		System.out.println("Canon: " + canonicalizationMethod);
-		Canonicalizer canonicalizer = Canonicalizer.getInstance(canonicalizationMethod);
-		return canonicalizer.canonicalizeSubtree(doc);
-	}
-	
-	public static String canonicalize(String input, String canonicalizationMethod) throws Exception {
-		if (input == null) {
-			return "";
-		} 
-		else {
-			ByteArrayInputStream inputStr = new ByteArrayInputStream(input.getBytes("UTF-8"));
-			byte[] output = canonicalize(inputStr, canonicalizationMethod);
-			return output != null ? new String(output, "UTF-8") : "";
-		}
-	}
-	
-	public static String removeBOM(String s) {
-		return s != null && s.length() != 0 ? (s.startsWith(Constants.UTF8_BOM) ? s.substring(1) : s) : s;
-	}
-	
-	/**
-	 * Fills MIME Type to the documents according to container manifest
-	 * @param docsForSignature - documents to fill MIME Type
-	 * @param xmlAsiceManifest - manifest content
-	 * @return documents with MIME Type set
-	 * @throws ParserConfigurationException
-	 * @throws SAXException
-	 * @throws IOException
-	 */
-	public static List<Document> setMimeType(List<Document> docsForSignature, String xmlAsiceManifest)
-			throws ParserConfigurationException, SAXException, IOException {
-		DocumentBuilderFactory dbf;
-		DocumentBuilder db;
-		InputSource source;
-		org.w3c.dom.Document domDocument = null;
-
-		dbf = DocumentBuilderFactory.newInstance();
-		db = dbf.newDocumentBuilder();
-		source = new InputSource(new ByteArrayInputStream(xmlAsiceManifest.getBytes()));
-		domDocument = db.parse(source);
-		domDocument.getDocumentElement().normalize();
-
-		NodeList dataObjectFormatList = domDocument.getDocumentElement().getElementsByTagName("asic:DataObjectReference");
-		if (dataObjectFormatList.getLength() > 0) {
-			for (int i = 0; i < dataObjectFormatList.getLength(); i++) {
-				Node obj = dataObjectFormatList.item(i);
-				if (obj.getNodeType() == Node.ELEMENT_NODE) {
-					Element objElement = (Element) obj;
-					for (Document document : docsForSignature) {
-						if (document.getName() != null) {
-							if (document.getName().equals(objElement.getAttribute("URI")) || document.getId().equals(objElement.getAttribute("URI"))) {
-								if (document.getMIMEType() == null)
-									document.setMIMEType(objElement.getAttribute("MimeType"));
-							}
-						}
-					}
-				}
-			}
-		} 
-		else {
-			dataObjectFormatList = domDocument.getDocumentElement().getElementsByTagName("manifest:file-entry");
-			for (int i = 0; i < dataObjectFormatList.getLength(); i++) {
-				Node obj = dataObjectFormatList.item(i);
-				if (obj.getNodeType() == Node.ELEMENT_NODE) {
-					Element objElement = (Element) obj;
-					for (Document document : docsForSignature) {
-						if (document.getName() != null) {
-							if (document.getName().equals(objElement.getAttribute("manifest:full-path")) || document.getId().equals(objElement.getAttribute("manifest:full-path"))) {
-								if (objElement.getAttribute("manifest:media-type") != null)
-									document.setMIMEType(objElement.getAttribute("manifest:media-type"));
-							}
-						}
-					}
-				}
-			}
-		}
-		return docsForSignature;
-	}
 
 }

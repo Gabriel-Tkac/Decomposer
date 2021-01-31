@@ -53,12 +53,10 @@ import sk.gabrieltkac.decomposer.utils.Utils;
 public class PAdES {
 	
 	/**
-	 * Nacita pomocou kniznice org.apache.pdfbox vlastnosti PDF dokumentu
-	 * a ulozi ich do zodpovedajucej instancie docsplit.model.document.Document
-	 * Elektronicke podpisy dokumentu spracuje pomocou triedy org.apache.pdfbox.pdmodel.interactive.digitalsignature.PDSignature,
-	 * precita z nich certifikat podpisu a casovej peciatky a vyplni a prepoji prislusne instancie podpisov a certifikatov
-	 * @param data - vstupne pole bytov s obsahom podpisaneho PDF dokumentu (objektu PAdES)
-	 * @return instancia docsplit.model.document.container reprezentujuca podpisovy kontajner PAdES
+	 * Using org.apache.pdfbox, reads PDF document properties<br>
+	 * Processes electronic signatures and signing certificates and their properties
+	 * @param data - byte array - PDF document content
+	 * @return Container instance
 	 * @throws Exception 
 	 * @throws DocSplitterException
 	 */
@@ -95,12 +93,12 @@ public class PAdES {
 				} 
 				catch (Exception e) {
 					e.printStackTrace();
-					throw new Exception("Nastal problem pri spracovani pdf suboru.", e);
+					throw new Exception("Error processing PDF document.", e);
 				}
 			}
 		}
 		catch (Exception e) {
-			throw new Exception("Nastal problem pri spracovani dokumentu pades.", e);
+			throw new Exception("Error processing PDF document.", e);
 		}
 
 		finally {
@@ -115,9 +113,9 @@ public class PAdES {
 	}
 	
 	/**
-	 * Odstrani z PDF dokumentu podpis signPDF a všetky neskoršie podpisy
-	 * @param documentPDF - vstupny PDF dokument
-	 * @param signPDF - posledny z podpisov, ktore sa odstrania
+	 * Removes electronic signatures from PDF document
+	 * @param documentPDF - input PDF document
+	 * @param signPDF - last electronic signature to remove
 	 * @throws Exception 
 	 */
 	static void removeSignField(PDDocument documentPDF, PDSignature signPDF) throws Exception {
@@ -126,7 +124,6 @@ public class PAdES {
 		}
 		Calendar signDate = signPDF.getSignDate();
 		if (signDate != null) {
-			//System.out.println("removeSignField: datum podpisu: " + Helper.dateToUTCString(signDate));
 		}
 		else {
 			return;
@@ -167,11 +164,11 @@ public class PAdES {
 	}
 	
 	/**
-	 * Nacita z PDF dokumentu podpis a vytvori objekt typu Signature pre ulozenie do vystupneho kontajneru
-	 * @param pdSignature - vstupny podpis z PDF dokumentu
-	 * @param data - vstupne pole bytov pre nacitanie podpisaneho obsahu
-	 * @param porCislo - poradove cislo podpisu v zozname podpisov dokumentu
-	 * @return objekt triedy Signature
+	 * Reads and creates Signature object from PDF signature
+	 * @param pdSignature - input electronic signature from PDF document
+	 * @param data - input byte array to evaluate
+	 * @param orderNumber - ordering number of current signature 
+	 * @return Signature instance
 	 * @throws Exception
 	 */
 	private static Signature makeSignature(PDSignature pdSignature, byte[] data, int porCislo) throws Exception {
@@ -189,7 +186,7 @@ public class PAdES {
 		signature.setName("Signature " + porCislo);
 		signature.setId("Signature" + porCislo);
 		signature.setCertificateHolder(pdSignature.getName());
-		System.out.println("Meno drzitela certifikatu: " + signature.getCertificateHolder());
+		System.out.println("Certificate holder name: " + signature.getCertificateHolder());
 		Calendar signDate = pdSignature.getSignDate(); 
 		if (signDate != null) {
 			signature.setSignatureTime(Utils.dateToDateTime(Utils.dateToUTC(signDate)));
@@ -207,11 +204,6 @@ public class PAdES {
 					break;
 				case "adbe.pkcs7.sha1": {
 					System.out.println("(2) adbe.pkcs7.sha1");
-					byte[] certData = contents.getBytes();
-					CertificateFactory factory = CertificateFactory.getInstance("X.509");
-					ByteArrayInputStream certStream = new ByteArrayInputStream(certData);
-					Collection<? extends java.security.cert.Certificate> certs = factory
-							.generateCertificates(certStream);
 					byte[] hash = MessageDigest.getInstance("SHA1").digest(buf);
 					certificate = verifyPKCS7(hash, contents, pdSignature);
 					signature.setSignatureCertificate(certificate);
@@ -236,13 +228,7 @@ public class PAdES {
 				}
 				case "ETSI.RFC3161":
 					System.out.println("(4) ETSI.RFC3161");
-					TimeStampToken timeStampToken = new TimeStampToken(
-							new CMSSignedData(contents.getBytes()));
-					CertificateFactory factory = CertificateFactory.getInstance("X.509");
-					ByteArrayInputStream certStream = new ByteArrayInputStream(contents.getBytes());
-					Collection<? extends java.security.cert.Certificate> certs = factory
-							.generateCertificates(certStream);
-					break;
+				break;
 				default:
 					;
 					break;
@@ -261,9 +247,9 @@ public class PAdES {
 	}
 
 	/**
-	 * Sformuje PDF document z pola bytov
-	 * @param data - vstupne pole bytov
-	 * @return dokument typu PDDocument
+	 * Creates PDF document from byte array
+	 * @param data - input byte array
+	 * @return PDDocument instance
 	 * @throws Exception 
 	 */
 	private static PDDocument getDocumentPDF(byte[] data) throws Exception {
@@ -273,26 +259,25 @@ public class PAdES {
 			return documentPDF; 
 		}
 		else {
-			throw new Exception("getDocumentPDF: Dokument je chraneny heslom.");
+			throw new Exception("getDocumentPDF: Document is password protected!");
 		}
 	}
-
+	
 	/**
-	 * Vytvori kontajner typu Document a vyplnio ho udajmi z PDF dokumentu
-	 * @param documentPDF - vstupny PDF dokument
-	 * @param porCislo - vstupne poradove cislo dokumentu v zozname podpisanych dokumentov; hlavny dokument ma poradove cislo 0
-	 * @return dokument typu Document
+	 * Creates and initializes Document instance based on PDF data
+	 * @param documentPDF - input PDF document
+	 * @param orderNumber - document order number
+	 * @return Document instance
 	 * @throws IOException
 	 */
-	private static Document getDocumentFromPDF(PDDocument documentPDF, int porCislo) throws IOException {
+	private static Document getDocumentFromPDF(PDDocument documentPDF, int orderNumber) throws IOException {
 		Document document = new Document();
 		String suffix = "";
-		if (porCislo > 0)
-			suffix = " (revizia " + porCislo + ")"; 
-		// setting Document
+		if (orderNumber > 0)
+			suffix = " (revision " + orderNumber + ")";
 		document.setId(java.util.UUID.randomUUID().toString());
 		document.setProcessId(java.util.UUID.randomUUID().toString());
-		document.setName("Dokument.pdf" + suffix);
+		document.setName("Document.pdf" + suffix);
 
 		if (documentPDF.getDocumentInformation() != null) {
 			if (documentPDF.getDocumentInformation().getTitle() != null) {
@@ -314,14 +299,14 @@ public class PAdES {
 		document.setContent(Base64.encodeBase64String(byteArrayOutputStream.toByteArray()));
 		byteArrayOutputStream.close();
 		return document;
-	} 
+	}
 
 	/**
-	 * Nacita udaje certifikatu z podpisu v PDF dokumente, ak ide o certifikat sifrovany algoritmom adbe.pkcs7.sha1
-	 * @param byteArray - pole bytov reprezentujuce obsah podpisanej casti PDF dokumentu
-	 * @param contents - instancia nesuca info o podpise v PDF dokumente
-	 * @param sig - instancia podpisu reprezentovana objektom kniznice org.apache.pdfbox
-	 * @return - instancia docsplit.model.document.Certificate
+	 * Reads certificate properties from PDF document, if it is adbe.pkcs7.sha1 - algorithm certificate
+	 * @param byteArray - byte array representing signed part of the PDF
+	 * @param contents - entity carrying signature properties
+	 * @param sig - signature instance
+	 * @return - docsplit.model.document.Certificate instance
 	 * @throws Exception
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -340,11 +325,11 @@ public class PAdES {
 	}
 
 	/**
-	 * Nacita z podpisanej casti obsahu PDF dokumentu certifikat podpisu a casovej peciatky a nasetuje ich do instancie podpisu
-	 * @param byteArray - pole bytov reprezentujuce obsah podpisanej casti PDF dokumentu
-	 * @param contents - instancia nesuca info o podpise v PDF dokumente
-	 * @param signature - instancia podpisu, ktorej sa vyplnia certifikaty
-	 * @return instancia podpisu s vyplnenymi certifikatmi
+	 * Reads signature certificate and timestamp certificate properties from PDF document
+	 * @param byteArray - byte array representing signed part of the PDF
+	 * @param contents - COSString instance - PDF Metadata
+	 * @param signature - Signature instance to fill certificates
+	 * @return Signature instance with certificates filled
 	 * @throws Exception
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -390,10 +375,10 @@ public class PAdES {
 	}
 
 	/**
-	 * Odstrani pole typu PDField (ako pravidlo, podpis) z PDF dokumentu
-	 * @param acroForm - acroforma
-	 * @param targetField - pole pre odstranenie
-	 * @return true ak sa podarilo, inak false 
+	 * Erases PDField (e. g. rule, signature) from PDF document widgets
+	 * @param acroForm - acroform
+	 * @param targetField - field t oremove
+	 * @return true if removal was successful 
 	 * @throws IOException
 	 */
 	static boolean removeField(PDAcroForm acroForm, PDField targetField) throws IOException {
@@ -434,8 +419,8 @@ public class PAdES {
 	}
 
 	/**
-	 * Vymaze pole typu PDField z widgetov PDF dokumentu
-	 * @param targetField - vstupne pole, ktore sa odstranuje
+	 * Erases PDField from PDF document widgets
+	 * @param targetField - field to remove
 	 * @throws IOException
 	 */
 	static void removeWidgets(PDField targetField) throws IOException {

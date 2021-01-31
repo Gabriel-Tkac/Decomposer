@@ -96,7 +96,7 @@ public class ASiC {
 		} 
 		catch (Exception e) {
 			e.printStackTrace();
-			throw new Exception("Nastala chyba pri rozoberani dokumentu Asice.");
+			throw new Exception("Error processing ASiC container.");
 		} 
 		finally {
 			try {
@@ -148,7 +148,7 @@ public class ASiC {
 			}
 		} 
 		catch (IOException e) {
-			throw new Exception("Nastala chyba pri spracovani dokumentov.", e);
+			throw new Exception("Error processing ASiC documents.", e);
 		}
 		if (document.getMIMEType()==null && (extension.equals("asice") || extension.equals("sce")))
 			document.setMIMEType(Constants.MIME_TYPE_ASICE);
@@ -184,7 +184,7 @@ public class ASiC {
 				signatures = XAdES.getSignatures(signaturesList, documents, signatures);
 			} 
 			catch (Exception e) {
-				throw new Exception("Nastala chyba pri spracovani podpisov xades.", e);
+				throw new Exception("Error processing XAdES signatures", e);
 				
 			}
 		}
@@ -194,7 +194,7 @@ public class ASiC {
 				signatures = CAdES.getSignatures(decodedBytes, documents);
 			} 
 			catch (Exception e) {
-				throw new Exception("Nastala chyba pri spracovani podpisov cades.", e);
+				throw new Exception("Error processing CAdES signatures", e);
 			}
 		}
 		return signatures;
